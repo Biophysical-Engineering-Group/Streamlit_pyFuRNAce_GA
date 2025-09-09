@@ -1,0 +1,14 @@
+# keep repo clean; the workflow rebuilds wheel each week
+.DS_Store
+.DS_Store?
+**/.DS_Store
+**.DS_Store
+**/.DS_Store?
+__pycache__
+**/__pycache__
+.vscode
+.vscode?
+*.pyc
+*.pyo
+*.pyd
+*.so

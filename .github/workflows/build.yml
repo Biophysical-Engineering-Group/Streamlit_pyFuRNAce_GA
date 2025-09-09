@@ -1,0 +1,100 @@
+name: Weekly patched Streamlit wheel
+
+on:
+  schedule:
+    # Every Monday at 03:30 UTC (tweak as you like)
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install wheel
+
+      - name: Download latest Streamlit wheel
+        run: |
+          rm -f *.whl || true
+          pip download streamlit --only-binary=:all:
+          echo "Wheel(s):"
+          ls -1 *.whl
+
+      - name: Unpack
+        run: |
+          python -m wheel unpack *.whl
+
+      - name: Patch index.html with GA snippet
+        run: |
+          python scripts/patch_streamlit.py
+
+      - name: Remove original wheel
+        run: |
+          rm -f *.whl
+
+      - name: Repack
+        run: |
+          # Repack from streamlit-*/ directory to a new wheel
+          python -m wheel pack streamlit-*
+          echo "Repacked:"
+          ls -1 *.whl
+
+      - name: Make filename predictable (optional)
+        run: |
+          # Rename to include "-ga" to indicate it's patched
+          WHEEL=$(ls -1 *.whl | head -n1)
+          BASE="${WHEEL%.whl}"
+          mv "$WHEEL" "${BASE}+ga.whl"
+          ls -1 *.whl
+
+      - name: Clean repo to only keep the new wheel
+        run: |
+          shopt -s extglob
+          # Keep only .git, .github, scripts, and the new wheel in the workspace.
+          mkdir -p keep_tmp
+          cp -r .github scripts *.whl keep_tmp/
+          rm -rf !(.git|.github|scripts|keep_tmp)
+          shopt -u extglob
+          mv keep_tmp/* .
+          rmdir keep_tmp
+
+      - name: Commit & push wheel if changed
+        run: |
+          set -e
+          WHEEL=$(ls -1 *.whl | head -n1)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Weekly: update ${WHEEL}"
+            git push
+          fi
+
+      - name: Create/update 'latest' release with asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          WHEEL=$(ls -1 *.whl | head -n1)
+          TAG="latest"
+          # Create tag if missing
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "Latest patched wheel" -n "Automated weekly build."
+          # Re-upload (delete existing asset with same name if any)
+          ASSET_EXISTS=$(gh release view "$TAG" --json assets -q ".assets[].name" | grep -Fx "$WHEEL" || true)
+          if [ -n "$ASSET_EXISTS" ]; then
+            gh release delete-asset "$TAG" "$WHEEL" -y
+          fi
+          gh release upload "$TAG" "$WHEEL" --clobber
