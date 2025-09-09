@@ -52,18 +52,21 @@ jobs:
           echo "Repacked:"
           ls -1 *.whl
 
-      - name: Make filename predictable (+ga suffix)
+      - name: Make filename predictable (+ga suffix) and export name
         run: |
+          set -e
           WHEEL=$(ls -1 *.whl | head -n1)
           case "$WHEEL" in
-            *+ga.whl) echo "Already has +ga suffix: $WHEEL" ;;
+            *+ga.whl) true ;;
             *) BASE="${WHEEL%.whl}"; mv "$WHEEL" "${BASE}+ga.whl" ;;
           esac
-          ls -1 *.whl
+          WHEEL=$(ls -1 *.whl | head -n1)
+          echo "Final wheel: $WHEEL"
+          # Export the wheel name for later steps
+          echo "WHEEL=$WHEEL" >> "$GITHUB_ENV"
 
       - name: Write latest.txt (PEP 508 direct reference)
         run: |
-          WHEEL=$(ls -1 *.whl | head -n1)
           echo "streamlit @ https://raw.githubusercontent.com/Biophysical-Engineering-Group/Streamlit_pyFuRNAce_GA/main/$WHEEL" > latest.txt
           echo "latest.txt ->"
           cat latest.txt
@@ -72,18 +75,17 @@ jobs:
         run: |
           rm -rf streamlit-*
 
-      # Keep only .github/, scripts/, the wheel, and latest.txt in the repo
-      - name: Clean repo to only keep the wheel and essential folders
+      # Keep only .github/, scripts/, README.md, the wheel, and latest.txt in the repo
+      - name: Clean repo to only keep the wheel and essential files
         run: |
           set -euo pipefail
           shopt -s extglob nullglob
-          rm -rf !(.git|.github|scripts|*.whl|latest.txt)
+          rm -rf !(.git|.github|scripts|README.md|*.whl|latest.txt)
           shopt -u extglob nullglob
 
       - name: Commit & push wheel and latest.txt if changed
         run: |
           set -e
-          WHEEL=$(ls -1 *.whl | head -n1)
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
@@ -99,11 +101,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          WHEEL=$(ls -1 *.whl | head -n1)
           TAG="latest"
           # Ensure release exists
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "Latest patched wheel" -n "Automated weekly build."
-          # Upload/replace assets
+          # Upload/replace assets using the recorded wheel name
           for ASSET in "$WHEEL" latest.txt; do
             if gh release view "$TAG" --json assets -q ".assets[].name" | grep -Fx "$ASSET" >/dev/null 2>&1; then
               gh release delete-asset "$TAG" "$ASSET" -y
