@@ -52,24 +52,35 @@ jobs:
           echo "Repacked:"
           ls -1 *.whl
 
-      - name: Make filename predictable (optional)
+      - name: Make filename predictable (+ga suffix)
         run: |
           WHEEL=$(ls -1 *.whl | head -n1)
-          BASE="${WHEEL%.whl}"
-          mv "$WHEEL" "${BASE}+ga.whl"
+          case "$WHEEL" in
+            *+ga.whl) echo "Already has +ga suffix: $WHEEL" ;;
+            *) BASE="${WHEEL%.whl}"; mv "$WHEEL" "${BASE}+ga.whl" ;;
+          esac
           ls -1 *.whl
 
-      # ⬇⬇⬇ FIXED CLEANUP (no moving directories around)
+      - name: Write latest.txt (PEP 508 direct reference)
+        run: |
+          WHEEL=$(ls -1 *.whl | head -n1)
+          echo "streamlit @ https://raw.githubusercontent.com/Biophysical-Engineering-Group/Streamlit_pyFuRNAce_GA/main/$WHEEL" > latest.txt
+          echo "latest.txt ->"
+          cat latest.txt
+
+      - name: Cleanup build artifacts (optional)
+        run: |
+          rm -rf streamlit-*
+
+      # Keep only .github/, scripts/, the wheel, and latest.txt in the repo
       - name: Clean repo to only keep the wheel and essential folders
         run: |
           set -euo pipefail
           shopt -s extglob nullglob
-          # Delete everything except .git, .github, scripts, and any *.whl
-          rm -rf !(.git|.github|scripts|*.whl)
-          # Optional: re-disable extglob
+          rm -rf !(.git|.github|scripts|*.whl|latest.txt)
           shopt -u extglob nullglob
 
-      - name: Commit & push wheel if changed
+      - name: Commit & push wheel and latest.txt if changed
         run: |
           set -e
           WHEEL=$(ls -1 *.whl | head -n1)
@@ -79,18 +90,23 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Weekly: update ${WHEEL}"
+            git commit -m "Weekly: update ${WHEEL} and latest.txt"
             git push
           fi
 
-      - name: Create/update 'latest' release with asset
+      - name: Create/update 'latest' release with assets (wheel + latest.txt)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
           WHEEL=$(ls -1 *.whl | head -n1)
           TAG="latest"
+          # Ensure release exists
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "Latest patched wheel" -n "Automated weekly build."
-          if gh release view "$TAG" --json assets -q ".assets[].name" | grep -Fx "$WHEEL" >/dev/null 2>&1; then
-            gh release delete-asset "$TAG" "$WHEEL" -y
-          fi
-          gh release upload "$TAG" "$WHEEL" --clobber
+          # Upload/replace assets
+          for ASSET in "$WHEEL" latest.txt; do
+            if gh release view "$TAG" --json assets -q ".assets[].name" | grep -Fx "$ASSET" >/dev/null 2>&1; then
+              gh release delete-asset "$TAG" "$ASSET" -y
+            fi
+            gh release upload "$TAG" "$ASSET" --clobber
+          done
