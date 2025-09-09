@@ -54,7 +54,6 @@ jobs:
 
       - name: Make filename predictable (+ga suffix) and export name
         run: |
-          set -e
           WHEEL=$(ls -1 *.whl | head -n1)
           case "$WHEEL" in
             *+ga.whl) true ;;
@@ -70,21 +69,13 @@ jobs:
           echo "latest.txt ->"
           cat latest.txt
 
-      - name: Cleanup build artifacts (optional)
-        run: |
-          rm -rf streamlit-*
-
       # Keep only .github/, scripts/, README.md, the wheel, and latest.txt in the repo
       - name: Clean repo to only keep the wheel and essential files
         run: |
-          set -euo pipefail
-          shopt -s extglob nullglob
           rm -rf !(.git|.github|scripts|README.md|*.whl|latest.txt)
-          shopt -u extglob nullglob
 
       - name: Commit & push wheel and latest.txt if changed
         run: |
-          set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
