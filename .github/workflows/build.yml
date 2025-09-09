@@ -2,7 +2,7 @@ name: Weekly patched Streamlit wheel
 
 on:
   schedule:
-    # Every Monday at 03:30 UTC (tweak as you like)
+    # Every Monday at 03:30 UTC
     - cron: "30 3 * * 1"
   workflow_dispatch:
 
@@ -25,35 +25,35 @@ jobs:
           python -m pip install --upgrade pip
           pip install wheel
 
-      - name: Download latest Streamlit wheel
+      - name: Download latest Streamlit wheel (only the package itself)
         run: |
           rm -f *.whl || true
-          pip download streamlit --only-binary=:all:
-          echo "Wheel(s):"
-          ls -1 *.whl
+          pip download --no-deps --only-binary=:all: streamlit
+          echo "Wheel(s) downloaded:"
+          ls -1 streamlit-*.whl
 
-      - name: Unpack
+      - name: Unpack just that wheel
         run: |
-          python -m wheel unpack *.whl
+          WHEEL=$(echo streamlit-*.whl)
+          python -m wheel unpack "$WHEEL"
+
+      - name: Remove original wheel
+        run: |
+          rm -f streamlit-*.whl
 
       - name: Patch index.html with GA snippet
         run: |
           python scripts/patch_streamlit.py
 
-      - name: Remove original wheel
-        run: |
-          rm -f *.whl
-
       - name: Repack
         run: |
-          # Repack from streamlit-*/ directory to a new wheel
-          python -m wheel pack streamlit-*
+          DIR=$(echo streamlit-*)
+          python -m wheel pack "$DIR"
           echo "Repacked:"
           ls -1 *.whl
 
       - name: Make filename predictable (optional)
         run: |
-          # Rename to include "-ga" to indicate it's patched
           WHEEL=$(ls -1 *.whl | head -n1)
           BASE="${WHEEL%.whl}"
           mv "$WHEEL" "${BASE}+ga.whl"
@@ -62,13 +62,14 @@ jobs:
       - name: Clean repo to only keep the new wheel
         run: |
           shopt -s extglob
-          # Keep only .git, .github, scripts, and the new wheel in the workspace.
           mkdir -p keep_tmp
+          # Keep workflow, scripts, and the wheel
           cp -r .github scripts *.whl keep_tmp/
+          # Remove everything except .git, .github, scripts, keep_tmp
           rm -rf !(.git|.github|scripts|keep_tmp)
           shopt -u extglob
           mv keep_tmp/* .
-          rmdir keep_tmp
+          rmdir keep_tmp || true
 
       - name: Commit & push wheel if changed
         run: |
@@ -90,11 +91,10 @@ jobs:
         run: |
           WHEEL=$(ls -1 *.whl | head -n1)
           TAG="latest"
-          # Create tag if missing
+          # Create 'latest' if missing
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "Latest patched wheel" -n "Automated weekly build."
-          # Re-upload (delete existing asset with same name if any)
-          ASSET_EXISTS=$(gh release view "$TAG" --json assets -q ".assets[].name" | grep -Fx "$WHEEL" || true)
-          if [ -n "$ASSET_EXISTS" ]; then
+          # Re-upload asset (delete existing if name collides)
+          if gh release view "$TAG" --json assets -q ".assets[].name" | grep -Fx "$WHEEL" >/dev/null 2>&1; then
             gh release delete-asset "$TAG" "$WHEEL" -y
           fi
           gh release upload "$TAG" "$WHEEL" --clobber
