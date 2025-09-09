@@ -62,7 +62,6 @@ jobs:
           esac
           WHEEL=$(ls -1 *.whl | head -n1)
           echo "Final wheel: $WHEEL"
-          # Export the wheel name for later steps
           echo "WHEEL=$WHEEL" >> "$GITHUB_ENV"
 
       - name: Write latest.txt (PEP 508 direct reference)
@@ -87,7 +86,7 @@ jobs:
         run: |
           set -e
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
             echo "No changes to commit."
@@ -96,18 +95,14 @@ jobs:
             git push
           fi
 
-      - name: Create/update 'latest' release with assets (wheel + latest.txt)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          TAG="latest"
-          # Ensure release exists
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "Latest patched wheel" -n "Automated weekly build."
-          # Upload/replace assets using the recorded wheel name
-          for ASSET in "$WHEEL" latest.txt; do
-            if gh release view "$TAG" --json assets -q ".assets[].name" | grep -Fx "$ASSET" >/dev/null 2>&1; then
-              gh release delete-asset "$TAG" "$ASSET" -y
-            fi
-            gh release upload "$TAG" "$ASSET" --clobber
-          done
+      # - name: Create/update 'latest' release with assets (wheel + latest.txt)
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     set -e
+      #     TAG="latest"
+      #     # Ensure release exists
+      #     gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "Latest patched wheel" -n "Automated weekly build."
+      #     # Sanity check, then upload both assets; --clobber replaces if present
+      #     test -f "$WHEEL" && test -f latest.txt
+      #     gh release upload "$TAG" "$WHEEL" latest.txt --clobber
