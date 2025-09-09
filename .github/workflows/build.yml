@@ -88,14 +88,14 @@ jobs:
             git push
           fi
 
-      # - name: Create/update 'latest' release with assets (wheel + latest.txt)
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run: |
-      #     set -e
-      #     TAG="latest"
-      #     # Ensure release exists
-      #     gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "Latest patched wheel" -n "Automated weekly build."
-      #     # Sanity check, then upload both assets; --clobber replaces if present
-      #     test -f "$WHEEL" && test -f latest.txt
-      #     gh release upload "$TAG" "$WHEEL" latest.txt --clobber
+      - name: Create/update 'latest' release with assets (wheel + latest.txt)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="latest"
+          # Ensure release exists
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "Latest patched wheel" -n "Automated weekly build."
+          # Sanity check, then upload both assets; --clobber replaces if present
+          test -f "$WHEEL" && test -f latest.txt
+          gh release upload "$TAG" "$WHEEL" latest.txt --clobber
