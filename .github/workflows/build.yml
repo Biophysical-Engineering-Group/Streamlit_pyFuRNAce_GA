@@ -59,17 +59,15 @@ jobs:
           mv "$WHEEL" "${BASE}+ga.whl"
           ls -1 *.whl
 
-      - name: Clean repo to only keep the new wheel
+      # ⬇⬇⬇ FIXED CLEANUP (no moving directories around)
+      - name: Clean repo to only keep the wheel and essential folders
         run: |
-          shopt -s extglob
-          mkdir -p keep_tmp
-          # Keep workflow, scripts, and the wheel
-          cp -r .github scripts *.whl keep_tmp/
-          # Remove everything except .git, .github, scripts, keep_tmp
-          rm -rf !(.git|.github|scripts|keep_tmp)
-          shopt -u extglob
-          mv keep_tmp/* .
-          rmdir keep_tmp || true
+          set -euo pipefail
+          shopt -s extglob nullglob
+          # Delete everything except .git, .github, scripts, and any *.whl
+          rm -rf !(.git|.github|scripts|*.whl)
+          # Optional: re-disable extglob
+          shopt -u extglob nullglob
 
       - name: Commit & push wheel if changed
         run: |
@@ -91,9 +89,7 @@ jobs:
         run: |
           WHEEL=$(ls -1 *.whl | head -n1)
           TAG="latest"
-          # Create 'latest' if missing
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "Latest patched wheel" -n "Automated weekly build."
-          # Re-upload asset (delete existing if name collides)
           if gh release view "$TAG" --json assets -q ".assets[].name" | grep -Fx "$WHEEL" >/dev/null 2>&1; then
             gh release delete-asset "$TAG" "$WHEEL" -y
           fi
