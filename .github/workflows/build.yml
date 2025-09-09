@@ -72,7 +72,9 @@ jobs:
       # Keep only .github/, scripts/, README.md, the wheel, and latest.txt in the repo
       - name: Clean repo to only keep the wheel and essential files
         run: |
+          shopt -s extglob nullglob
           rm -rf !(.git|.github|scripts|README.md|*.whl|latest.txt)
+          shopt -u extglob nullglob
 
       - name: Commit & push wheel and latest.txt if changed
         run: |
