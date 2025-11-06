@@ -1,1 +1,1 @@
-streamlit @ https://raw.githubusercontent.com/Biophysical-Engineering-Group/Streamlit_pyFuRNAce_GA/main/streamlit-1.50.0-py3-none-any+ga.whl
+streamlit @ https://raw.githubusercontent.com/Biophysical-Engineering-Group/Streamlit_pyFuRNAce_GA/main/streamlit-1.51.0-py3-none-any+ga.whl
