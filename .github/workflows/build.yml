@@ -1,9 +1,9 @@
-name: Weekly patched Streamlit wheel
+name: Patched Streamlit wheel
 
 on:
-  schedule:
-    # Every Monday at 03:30 UTC
-    - cron: "30 3 * * 1"
+  # schedule:
+  #   # Every Monday at 03:30 UTC
+  #   - cron: "30 3 * * 1"
   workflow_dispatch:
 
 permissions:
