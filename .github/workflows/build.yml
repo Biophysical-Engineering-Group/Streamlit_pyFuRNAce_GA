@@ -23,12 +23,12 @@ jobs:
       - name: Install build deps
         run: |
           python -m pip install --upgrade pip
-          pip install wheel
+          pip install "wheel>=0.48.0"
 
-      - name: Download latest Streamlit wheel (only the package itself)
+      - name: Download latest Streamlit wheel (currently downloading 1.51.0 wheel)
         run: |
           rm -f *.whl || true
-          pip download --no-deps --only-binary=:all: streamlit
+          pip download --no-deps --only-binary=:all: streamlit==1.51.0
           echo "Wheel(s) downloaded:"
           ls -1 streamlit-*.whl
 
@@ -48,17 +48,12 @@ jobs:
       - name: Repack
         run: |
           DIR=$(echo streamlit-*)
-          python -m wheel pack "$DIR"
+          python -m wheel pack --local-version ga "$DIR"
           echo "Repacked:"
           ls -1 *.whl
 
-      - name: Make filename predictable (+ga suffix) and export name
+      - name: Export custom wheel filename
         run: |
-          WHEEL=$(ls -1 *.whl | head -n1)
-          case "$WHEEL" in
-            *+ga.whl) true ;;
-            *) BASE="${WHEEL%.whl}"; mv "$WHEEL" "${BASE}+ga.whl" ;;
-          esac
           WHEEL=$(ls -1 *.whl | head -n1)
           echo "Final wheel: $WHEEL"
           echo "WHEEL=$WHEEL" >> "$GITHUB_ENV"
@@ -73,7 +68,7 @@ jobs:
       - name: Clean repo to only keep the wheel and essential files
         run: |
           shopt -s extglob nullglob
-          rm -rf !(.git|.github|scripts|README.md|*.whl|latest.txt)
+          rm -rf !(.git|.github|.gitignore|scripts|README.md|*.whl|latest.txt)
           shopt -u extglob nullglob
 
       - name: Commit & push wheel and latest.txt if changed

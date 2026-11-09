@@ -33,6 +33,8 @@ def main():
     with open(p, "r", encoding="utf-8") as f:
         html = f.read()
 
+    if "<head>" not in html:
+        raise SystemExit("ERROR: Could not find <head> in index.html")
     html = html.replace("<head>", "<head>\n" + GA_SNIPPET, 1)
 
     with open(p, "w", encoding="utf-8") as f:
